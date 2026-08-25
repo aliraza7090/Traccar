@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+<properties>
+
+    <!-- Pulls in all of Traccar's built-in defaults, including every GPS
+         device protocol and its default port (5000-5150). Keep this line. -->
+    <entry key='config.default'>./conf/default.xml</entry>
+
+    <!--
+      Database (RDS MariaDB).
+      MariaDB is wire-compatible with MySQL, so the bundled MySQL JDBC driver works.
+
+      Only the driver is set here. The connection URL, user, and password are
+      injected at runtime as environment variables so no secret is baked into
+      the image. Traccar auto-maps env vars to config keys (dots -> underscores,
+      uppercased):
+          DATABASE_URL       -> database.url
+          DATABASE_USER      -> database.user
+          DATABASE_PASSWORD  -> database.password
+      Set DATABASE_PASSWORD via an ECS secret (Secrets Manager / SSM), not plain text.
+    -->
+    <entry key='database.driver'>com.mysql.cj.jdbc.Driver</entry>
+
+    <!-- Web UI / REST API port. -->
+    <entry key='web.port'>8082</entry>
+
+</properties>
