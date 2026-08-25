@@ -1,0 +1,44 @@
+version: 0.2
+
+# CodeBuild spec: build the Traccar image and push it to ECR.
+#
+# Requires the CodeBuild project to have "privileged mode" ENABLED (Docker builds),
+# and the CodeBuild service role to allow ECR auth/push:
+#   ecr:GetAuthorizationToken, ecr:BatchCheckLayerAvailability,
+#   ecr:InitiateLayerUpload, ecr:UploadLayerPart, ecr:CompleteLayerUpload,
+#   ecr:PutImage, ecr:BatchGetImage
+#
+# Set these environment variables on the CodeBuild project:
+#   AWS_ACCOUNT_ID   e.g. 083454813933
+#   AWS_DEFAULT_REGION  e.g. us-east-2
+#   IMAGE_REPO_NAME  e.g. traccar
+#   CONTAINER_NAME   e.g. traccar   (must match the name in the ECS task definition)
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - REPO_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      # Tag with the git commit short hash (falls back to "latest" if unavailable)
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
+      - IMAGE_TAG=${IMAGE_TAG:0:8}
+
+  build:
+    commands:
+      - echo Building the Docker image...
+      - docker build -t $REPO_URI:$IMAGE_TAG -t $REPO_URI:latest .
+
+  post_build:
+    commands:
+      - echo Pushing the Docker image to ECR...
+      - docker push $REPO_URI:$IMAGE_TAG
+      - docker push $REPO_URI:latest
+      # imagedefinitions.json lets a CodePipeline ECS deploy stage roll the service
+      # onto the new image automatically.
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$CONTAINER_NAME" "$REPO_URI:$IMAGE_TAG" > imagedefinitions.json
+      - echo Done. Pushed $REPO_URI:$IMAGE_TAG
+
+artifacts:
+  files:
+    - imagedefinitions.json
